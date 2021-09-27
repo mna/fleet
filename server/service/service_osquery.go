@@ -700,10 +700,7 @@ func (svc *Service) SubmitDistributedQueryResults(
 	}
 
 	if len(labelResults) > 0 {
-		host.Modified = true
-		host.LabelUpdatedAt = svc.clock.Now()
-		err = svc.ds.RecordLabelQueryExecutions(ctx, &host, labelResults, svc.clock.Now())
-		if err != nil {
+		if err := svc.task.RecordLabelQueryExecutions(ctx, &host, labelResults, svc.clock.Now()); err != nil {
 			logging.WithErr(ctx, err)
 		}
 	}
