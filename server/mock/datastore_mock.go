@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/fleetdm/fleet/v4/server/fleet"
+	"github.com/jmoiron/sqlx"
 )
 
 var _ fleet.Datastore = (*DataStore)(nil)
@@ -290,6 +291,8 @@ type TeamPolicyFunc func(ctx context.Context, teamID uint, policyID uint) (*flee
 type LockFunc func(ctx context.Context, name string, owner string, expiration time.Duration) (bool, error)
 
 type UnlockFunc func(ctx context.Context, name string, owner string) error
+
+type AdhocRetryTxFunc func(ctx context.Context, fn func(sqlx.ExtContext) error) error
 
 type DataStore struct {
 	NewCarveFunc        NewCarveFunc
@@ -711,6 +714,9 @@ type DataStore struct {
 
 	UnlockFunc        UnlockFunc
 	UnlockFuncInvoked bool
+
+	AdhocRetryTxFunc        AdhocRetryTxFunc
+	AdhocRetryTxFuncInvoked bool
 }
 
 func (s *DataStore) NewCarve(ctx context.Context, metadata *fleet.CarveMetadata) (*fleet.CarveMetadata, error) {
@@ -1411,4 +1417,9 @@ func (s *DataStore) Lock(ctx context.Context, name string, owner string, expirat
 func (s *DataStore) Unlock(ctx context.Context, name string, owner string) error {
 	s.UnlockFuncInvoked = true
 	return s.UnlockFunc(ctx, name, owner)
+}
+
+func (s *DataStore) AdhocRetryTx(ctx context.Context, fn func(sqlx.ExtContext) error) error {
+	s.AdhocRetryTxFuncInvoked = true
+	return s.AdhocRetryTxFunc(ctx, fn)
 }
