@@ -207,3 +207,47 @@ func (svc Service) checkWriteForHostIDs(ctx context.Context, ids []uint) error {
 	}
 	return nil
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// Get Host Summary
+////////////////////////////////////////////////////////////////////////////////
+
+type getHostSummaryResponse struct {
+	fleet.HostSummary
+	Err error `json:"error,omitempty"`
+}
+
+func (r getHostSummaryResponse) error() error { return r.Err }
+
+func getHostSummaryEndpoint(ctx context.Context, request interface{}, svc fleet.Service) (interface{}, error) {
+	summary, err := svc.GetHostSummary(ctx)
+	if err != nil {
+		return getHostSummaryResponse{Err: err}, nil
+	}
+
+	return getHostSummaryResponse{
+		HostSummary: *summary,
+	}, nil
+}
+
+func (svc Service) GetHostSummary(ctx context.Context) (*fleet.HostSummary, error) {
+	if err := svc.authz.Authorize(ctx, &fleet.Host{}, fleet.ActionList); err != nil {
+		return nil, err
+	}
+	vc, ok := viewer.FromContext(ctx)
+	if !ok {
+		return nil, fleet.ErrNoContext
+	}
+	filter := fleet.TeamFilter{User: vc.User, IncludeObserver: true}
+
+	online, offline, mia, new, err := svc.ds.GenerateHostStatusStatistics(ctx, filter, svc.clock.Now())
+	if err != nil {
+		return nil, err
+	}
+	return &fleet.HostSummary{
+		OnlineCount:  online,
+		OfflineCount: offline,
+		MIACount:     mia,
+		NewCount:     new,
+	}, nil
+}

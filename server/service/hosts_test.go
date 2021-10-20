@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/fleetdm/fleet/v4/server/authz"
 	"github.com/fleetdm/fleet/v4/server/fleet"
@@ -34,4 +35,22 @@ func TestListHosts(t *testing.T) {
 	_, err = svc.ListHosts(context.Background(), fleet.HostListOptions{})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), authz.ForbiddenErrorMessage)
+}
+
+func TestGetHostSummary(t *testing.T) {
+	ds := new(mock.Store)
+	svc := newTestService(ds, nil, nil)
+
+	ds.GenerateHostStatusStatisticsFunc = func(ctx context.Context, filter fleet.TeamFilter, now time.Time) (online uint, offline uint, mia uint, new uint, err error) {
+		return 1, 2, 3, 4, nil
+	}
+
+	want := &fleet.HostSummary{OnlineCount: 1, OfflineCount: 2, MIACount: 3, NewCount: 4}
+	summary, err := svc.GetHostSummary(test.UserContext(test.UserAdmin))
+	require.NoError(t, err)
+	require.Equal(t, summary, want)
+
+	summary, err = svc.GetHostSummary(test.UserContext(test.UserNoRoles))
+	require.NoError(t, err)
+	require.Equal(t, summary, want)
 }
