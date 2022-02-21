@@ -290,8 +290,21 @@ func testPoliciesMembershipView(deferred bool, t *testing.T, ds *Datastore) {
 	queries, err := ds.PolicyQueriesForHost(context.Background(), host1)
 	require.NoError(t, err)
 	require.Len(t, queries, 2)
-	assert.Equal(t, q.Query, queries[fmt.Sprint(q.ID)])
-	assert.Equal(t, q2.Query, queries[fmt.Sprint(q2.ID)])
+	assert.Equal(t, q.Query, queryByPolicyID(queries, q.ID))
+	assert.Equal(t, q2.Query, queryByPolicyID(queries, q2.ID))
+}
+
+// given a map of policy as returned by PolicyQueriesForHost, returns the
+// value of that map corresponding to the policyID. This is a helper function
+// required due to the encoding of the key as "<policyID>_<lastUpdatedTimestamp>".
+func queryByPolicyID(policyQueries map[string]string, policyID uint) string {
+	prefix := fmt.Sprintf("%d_", policyID)
+	for k, v := range policyQueries {
+		if strings.HasPrefix(k, prefix) {
+			return v
+		}
+	}
+	return ""
 }
 
 func testTeamPolicyLegacy(t *testing.T, ds *Datastore) {
@@ -751,7 +764,15 @@ func testPolicyQueriesForHostPlatforms(t *testing.T, ds *Datastore) {
 			// PolicyQueriesForHost is the endpoint used by osquery agents when they check in.
 			queries, err := ds.PolicyQueriesForHost(context.Background(), tc.host)
 			require.NoError(t, err)
+
+			// cleanup the queries key to keep only the policy ID (PolicyQueriesForHost returns
+			// <policy_id>_<last_updated_ts>), to simplify the test assertion.
+			for k, v := range queries {
+				delete(queries, k)
+				queries[strings.Split(k, "_")[0]] = v
+			}
 			require.Equal(t, tc.expectedPolicies.policyQueries, queries)
+
 			// ListPoliciesForHost is the endpoint used by fleet UI/API clients.
 			hostPolicies, err := ds.ListPoliciesForHost(context.Background(), tc.host)
 			require.NoError(t, err)
@@ -828,13 +849,13 @@ func testPolicyQueriesForHost(t *testing.T, ds *Datastore) {
 	queries, err := ds.PolicyQueriesForHost(context.Background(), host1)
 	require.NoError(t, err)
 	require.Len(t, queries, 2)
-	assert.Equal(t, q.Query, queries[fmt.Sprint(q.ID)])
-	assert.Equal(t, q2.Query, queries[fmt.Sprint(q2.ID)])
+	assert.Equal(t, q.Query, queryByPolicyID(queries, q.ID))
+	assert.Equal(t, q2.Query, queryByPolicyID(queries, q2.ID))
 
 	queries, err = ds.PolicyQueriesForHost(context.Background(), host2)
 	require.NoError(t, err)
 	require.Len(t, queries, 1)
-	assert.Equal(t, q.Query, queries[fmt.Sprint(q.ID)])
+	assert.Equal(t, q.Query, queryByPolicyID(queries, q.ID))
 
 	require.NoError(t, ds.RecordPolicyQueryExecutions(context.Background(), host1, map[uint]*bool{tp.ID: ptr.Bool(false), gp.ID: nil}, time.Now(), false))
 

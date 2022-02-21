@@ -353,8 +353,9 @@ func deletePolicyDB(ctx context.Context, q sqlx.ExtContext, ids []uint, teamID *
 // PolicyQueriesForHost returns the policy queries that are to be executed on the given host.
 func (ds *Datastore) PolicyQueriesForHost(ctx context.Context, host *fleet.Host) (map[string]string, error) {
 	var rows []struct {
-		ID    string `db:"id"`
-		Query string `db:"query"`
+		ID        string    `db:"id"`
+		Query     string    `db:"query"`
+		UpdatedAt time.Time `db:"updated_at"`
 	}
 	if host.FleetPlatform() == "" {
 		// We log to help troubleshooting in case this happens, as the host
@@ -364,6 +365,7 @@ func (ds *Datastore) PolicyQueriesForHost(ctx context.Context, host *fleet.Host)
 	q := dialect.From("policies").Select(
 		goqu.I("id"),
 		goqu.I("query"),
+		goqu.I("updated_at"),
 	).Where(
 		goqu.And(
 			goqu.Or(
@@ -388,7 +390,8 @@ func (ds *Datastore) PolicyQueriesForHost(ctx context.Context, host *fleet.Host)
 	}
 	results := make(map[string]string)
 	for _, row := range rows {
-		results[row.ID] = row.Query
+		ts := row.UpdatedAt.Unix()
+		results[fmt.Sprintf("%s_%d", row.ID, ts)] = row.Query
 	}
 	return results, nil
 }
