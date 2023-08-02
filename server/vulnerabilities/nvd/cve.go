@@ -170,7 +170,7 @@ func TranslateCPEToCVE(
 
 		// collect vuln only if inserted, otherwise we would send
 		// webhook requests for the same vulnerability over and over again until
-		// it is older than 2 days.
+		// it is older than N days (recent_vulnerability_max_age setting).
 		if collectVulns && ok {
 			newVulns = append(newVulns, vuln)
 		}
